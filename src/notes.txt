@@ -1,0 +1,10 @@
+Thoughts
+
+Initially creating the 2d rendering of a car track and racing line was easy. Ran into issues not using the correct car object, which
+caused the car not to be rendered onto the track.
+Second step was creating an edit mode, that could edit the track to different dimensions. Simple edit mode that calls the component
+was an easy implementation.
+Third step is where the real research will begin. I'm going to start by implementing vehicle dynamics, which includes tire friction
+weight transferring and perhaps if not too difficult, aerodynamics.
+To begin the documentation process, I have found the book called Vehicle dynamics theory and application by Reza N. Jazar.
+

@@ -22,7 +22,7 @@ public class Main {
     }
 
     private static void createSampleTrack(Track track) {
-        int points = 20;
+        int points = 80;
         double radius = 200;
 
         for (int i = 0; i < points; i++) {

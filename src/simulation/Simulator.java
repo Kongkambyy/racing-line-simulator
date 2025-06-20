@@ -10,15 +10,16 @@ public class Simulator {
     private Car car;
     private Track track;
 
-    private static final double DT = 0.016; //
+    private static final double TARGET_FPS = 500.0;
+    private static final int TIMER_DELAY = (int)(1000.0 / TARGET_FPS);
+    private static final double DT = 1.0 / TARGET_FPS;
 
     public Simulator(RenderPanel renderPanel) {
         this.renderPanel = renderPanel;
         this.track = renderPanel.getTrack();
         this.car = new Car();
 
-        animationTimer = new Timer(16, e -> {
-            System.out.println("Timer Tick!");
+        animationTimer = new Timer(TIMER_DELAY, e -> {
             updateSimulation();
             renderPanel.repaint();
         });
@@ -26,14 +27,11 @@ public class Simulator {
 
     private void updateSimulation() {
         if (track.centerLine.size() < 2) {
-            System.out.println("Track has less than 2 points!");
             return;
         }
 
         double distanceToMove = car.speed * DT;
-
         moveCarAlongTrack(distanceToMove);
-
         updateCarWorldPosition();
     }
 
@@ -44,9 +42,7 @@ public class Simulator {
         );
 
         double segmentLength = segmentStart.distanceTo(segmentEnd);
-
         double progressIncrement = distance / segmentLength;
-
         car.segmentProgress += progressIncrement;
 
         if (car.segmentProgress >= 1.0) {
@@ -88,5 +84,19 @@ public class Simulator {
         car.currentSegment = 0;
         car.segmentProgress = 0;
         car.speed = 50;
+    }
+
+    public void setTargetFPS(double fps) {
+        boolean wasRunning = animationTimer.isRunning();
+        if (wasRunning) {
+            stop();
+        }
+
+        int newDelay = (int)(1000.0 / fps);
+        animationTimer.setDelay(newDelay);
+
+        if (wasRunning) {
+            start();
+        }
     }
 }

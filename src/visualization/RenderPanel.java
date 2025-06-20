@@ -18,6 +18,12 @@ public class RenderPanel extends JPanel implements MouseListener, MouseMotionLis
     private boolean showTrack = true;
     private boolean showRacingLine = true;
     private boolean showGrid = true;
+    private boolean editMode = false;
+
+    private Point2D lastMouseWorldPos;
+    private boolean isDragging = false;
+    private int selectedPointIndex = -1;
+    private static final double POINT_SELECT_RADIUS = 20.0;
 
     public RenderPanel() {
         setBackground(new Color(30, 30, 30));
@@ -30,6 +36,16 @@ public class RenderPanel extends JPanel implements MouseListener, MouseMotionLis
         addMouseListener(this);
         addMouseMotionListener(this);
         addMouseWheelListener(this);
+
+        setFocusable(true);
+        addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_E) {
+                    toggleEditMode();
+                }
+            }
+        });
     }
 
     @Override
@@ -37,8 +53,8 @@ public class RenderPanel extends JPanel implements MouseListener, MouseMotionLis
         super.paintComponent(g);
         Graphics2D g2d = (Graphics2D) g;
 
-        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
-                RenderingHints.VALUE_ANTIALIAS_ON);
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_SPEED);
 
         AffineTransform originalTransform = g2d.getTransform();
 
@@ -50,14 +66,20 @@ public class RenderPanel extends JPanel implements MouseListener, MouseMotionLis
         if (showTrack) drawTrack(g2d);
         if (showRacingLine) drawRacingLine(g2d);
 
+        if (editMode) {
+            drawTrackPoints(g2d);
+        }
+
         if (car != null) {
-            System.out.println("Car is printed!");
             drawCar(g2d);
-        } else {
-            System.out.println("Car is null!");
         }
 
         g2d.setTransform(originalTransform);
+
+        if (editMode) {
+            g2d.setColor(Color.YELLOW);
+            g2d.drawString("EDIT MODE - Press E to toggle, Click to add points, Drag to move", 10, 20);
+        }
     }
 
     private void drawGrid(Graphics2D g2d) {
@@ -103,6 +125,23 @@ public class RenderPanel extends JPanel implements MouseListener, MouseMotionLis
         g2d.draw(path);
     }
 
+    private void drawTrackPoints(Graphics2D g2d) {
+        g2d.setStroke(new BasicStroke(2.0f / (float)camera.zoom));
+
+        for (int i = 0; i < track.centerLine.size(); i++) {
+            Point2D p = track.centerLine.get(i);
+
+            if (i == selectedPointIndex) {
+                g2d.setColor(Color.RED);
+            } else {
+                g2d.setColor(Color.CYAN);
+            }
+
+            double radius = 8.0 / camera.zoom;
+            g2d.fill(new Ellipse2D.Double(p.x - radius, p.y - radius, radius * 2, radius * 2));
+        }
+    }
+
     private void drawRacingLine(Graphics2D g2d) {
         if (racingLine.points.size() < 2) return;
 
@@ -120,6 +159,94 @@ public class RenderPanel extends JPanel implements MouseListener, MouseMotionLis
 
             g2d.draw(new Line2D.Double(p1.x, p1.y, p2.x, p2.y));
         }
+    }
+
+    private void drawCar(Graphics2D g2d) {
+        AffineTransform oldTransform = g2d.getTransform();
+
+        g2d.translate(car.position.x, car.position.y);
+        g2d.rotate(car.heading);
+
+        g2d.setColor(Color.RED);
+        g2d.fillRect(-15, -8, 30, 16);
+
+        g2d.setColor(Color.YELLOW);
+        g2d.fillPolygon(new int[]{15, 25, 15}, new int[]{-5, 0, 5}, 3);
+
+        g2d.setTransform(oldTransform);
+    }
+
+    private Point2D screenToWorld(Point screenPoint) {
+        double worldX = (screenPoint.x - getWidth() / 2) / camera.zoom + camera.x;
+        double worldY = (screenPoint.y - getHeight() / 2) / camera.zoom + camera.y;
+        return new Point2D(worldX, worldY);
+    }
+
+    private int findNearestTrackPoint(Point2D worldPos) {
+        double minDistance = Double.MAX_VALUE;
+        int nearestIndex = -1;
+
+        for (int i = 0; i < track.centerLine.size(); i++) {
+            Point2D trackPoint = track.centerLine.get(i);
+            double distance = trackPoint.distanceTo(worldPos);
+
+            if (distance < minDistance && distance < POINT_SELECT_RADIUS / camera.zoom) {
+                minDistance = distance;
+                nearestIndex = i;
+            }
+        }
+
+        return nearestIndex;
+    }
+
+    public void toggleEditMode() {
+        editMode = !editMode;
+        selectedPointIndex = -1;
+        repaint();
+    }
+
+    @Override
+    public void mousePressed(MouseEvent e) {
+        Point2D worldPos = screenToWorld(e.getPoint());
+        lastMouseWorldPos = worldPos;
+
+        if (editMode) {
+            selectedPointIndex = findNearestTrackPoint(worldPos);
+
+            if (selectedPointIndex == -1 && e.getButton() == MouseEvent.BUTTON1) {
+                track.addPoint(worldPos.x, worldPos.y);
+                repaint();
+            }
+        }
+    }
+
+    @Override
+    public void mouseDragged(MouseEvent e) {
+        Point2D currentWorldPos = screenToWorld(e.getPoint());
+
+        if (editMode && selectedPointIndex != -1) {
+            Point2D trackPoint = track.centerLine.get(selectedPointIndex);
+            trackPoint.x = currentWorldPos.x;
+            trackPoint.y = currentWorldPos.y;
+            repaint();
+        } else if (!editMode && lastMouseWorldPos != null) {
+            double dx = (e.getX() - (getWidth() / 2)) / camera.zoom - lastMouseWorldPos.x;
+            double dy = (e.getY() - (getHeight() / 2)) / camera.zoom - lastMouseWorldPos.y;
+
+            camera.x -= dx;
+            camera.y -= dy;
+            repaint();
+        }
+
+        lastMouseWorldPos = currentWorldPos;
+    }
+
+    @Override
+    public void mouseWheelMoved(MouseWheelEvent e) {
+        double factor = e.getWheelRotation() < 0 ? 1.1 : 0.9;
+        camera.zoom *= factor;
+        camera.zoom = Math.max(0.1, Math.min(5.0, camera.zoom));
+        repaint();
     }
 
     public void setTrack(Track track) {
@@ -155,62 +282,21 @@ public class RenderPanel extends JPanel implements MouseListener, MouseMotionLis
         repaint();
     }
 
-    private Point lastMousePos;
-
-    @Override
-    public void mousePressed(MouseEvent e) {
-        lastMousePos = e.getPoint();
-    }
-
-    @Override
-    public void mouseDragged(MouseEvent e) {
-        if (lastMousePos != null) {
-            int dx = e.getX() - lastMousePos.x;
-            int dy = e.getY() - lastMousePos.y;
-
-            camera.x -= dx / camera.zoom;
-            camera.y -= dy / camera.zoom;
-
-            lastMousePos = e.getPoint();
-            repaint();
-        }
-    }
-
-    @Override
-    public void mouseWheelMoved(MouseWheelEvent e) {
-        double factor = e.getWheelRotation() < 0 ? 1.1 : 0.9;
-        camera.zoom *= factor;
-        camera.zoom = Math.max(0.1, Math.min(5.0, camera.zoom));
-        repaint();
-    }
-
-    private void drawCar(Graphics2D g2d) {
-        AffineTransform oldTransform = g2d.getTransform();
-
-        g2d.translate(car.position.x, car.position.y);
-        g2d.rotate(car.heading);
-
-        g2d.setColor(Color.RED);
-        g2d.fillRect(-15, -8, 30, 16);
-
-        g2d.setColor(Color.YELLOW);
-        g2d.fillPolygon(new int[]{15, 25, 15}, new int[]{-5, 0, 5}, 3);
-
-        g2d.setTransform(oldTransform);
+    public void setCar(Car car) {
+        this.car = car;
     }
 
     @Override
     public void mouseClicked(MouseEvent e) {}
     @Override
-    public void mouseReleased(MouseEvent e) { lastMousePos = null; }
+    public void mouseReleased(MouseEvent e) {
+        lastMouseWorldPos = null;
+        selectedPointIndex = -1;
+    }
     @Override
     public void mouseEntered(MouseEvent e) {}
     @Override
     public void mouseExited(MouseEvent e) {}
     @Override
     public void mouseMoved(MouseEvent e) {}
-
-    public void setCar(Car car) {
-        this.car = car;
-    }
 }
