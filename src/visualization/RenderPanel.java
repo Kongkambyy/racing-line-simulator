@@ -98,21 +98,21 @@ public class RenderPanel extends JPanel implements MouseListener, MouseMotionLis
     }
 
     private void drawTrack(Graphics2D g2d) {
-        if (track.centerLine.size() < 2) return;
+        if (track.getCenterLine().size() < 2) return;
 
-        g2d.setStroke(new BasicStroke((float)track.trackWidth));
+        g2d.setStroke(new BasicStroke((float)track.getTrackWidth() / (float)camera.zoom));
         g2d.setColor(new Color(80, 80, 80));
 
         Path2D path = new Path2D.Double();
-        Point2D first = track.centerLine.get(0);
+        Point2D first = track.getCenterLine().get(0);
         path.moveTo(first.x, first.y);
 
-        for (int i = 1; i < track.centerLine.size(); i++) {
-            Point2D p = track.centerLine.get(i);
+        for (int i = 1; i < track.getCenterLine().size(); i++) {
+            Point2D p = track.getCenterLine().get(i);
             path.lineTo(p.x, p.y);
         }
 
-        if (track.centerLine.size() > 2) {
+        if (track.getCenterLine().size() > 2) {
             path.closePath();
         }
 
@@ -128,8 +128,8 @@ public class RenderPanel extends JPanel implements MouseListener, MouseMotionLis
     private void drawTrackPoints(Graphics2D g2d) {
         g2d.setStroke(new BasicStroke(2.0f / (float)camera.zoom));
 
-        for (int i = 0; i < track.centerLine.size(); i++) {
-            Point2D p = track.centerLine.get(i);
+        for (int i = 0; i < track.getCenterLine().size(); i++) {
+            Point2D p = track.getCenterLine().get(i);
 
             if (i == selectedPointIndex) {
                 g2d.setColor(Color.RED);
@@ -186,8 +186,8 @@ public class RenderPanel extends JPanel implements MouseListener, MouseMotionLis
         double minDistance = Double.MAX_VALUE;
         int nearestIndex = -1;
 
-        for (int i = 0; i < track.centerLine.size(); i++) {
-            Point2D trackPoint = track.centerLine.get(i);
+        for (int i = 0; i < track.getCenterLine().size(); i++) {
+            Point2D trackPoint = track.getCenterLine().get(i);
             double distance = trackPoint.distanceTo(worldPos);
 
             if (distance < minDistance && distance < POINT_SELECT_RADIUS / camera.zoom) {
@@ -225,7 +225,7 @@ public class RenderPanel extends JPanel implements MouseListener, MouseMotionLis
         Point2D currentWorldPos = screenToWorld(e.getPoint());
 
         if (editMode && selectedPointIndex != -1) {
-            Point2D trackPoint = track.centerLine.get(selectedPointIndex);
+            Point2D trackPoint = track.getCenterLine().get(selectedPointIndex);
             trackPoint.x = currentWorldPos.x;
             trackPoint.y = currentWorldPos.y;
             repaint();

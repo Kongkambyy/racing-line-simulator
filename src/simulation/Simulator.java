@@ -26,7 +26,7 @@ public class Simulator {
     }
 
     private void updateSimulation() {
-        if (track.centerLine.size() < 2) {
+        if (track.getCenterLine().size() < 2) {
             return;
         }
 
@@ -36,9 +36,9 @@ public class Simulator {
     }
 
     private void moveCarAlongTrack(double distance) {
-        Point2D segmentStart = track.centerLine.get(car.currentSegment);
-        Point2D segmentEnd = track.centerLine.get(
-                (car.currentSegment + 1) % track.centerLine.size()
+        Point2D segmentStart = track.getCenterLine().get(car.currentSegment);
+        Point2D segmentEnd = track.getCenterLine().get(
+                (car.currentSegment + 1) % track.getCenterLine().size()
         );
 
         double segmentLength = segmentStart.distanceTo(segmentEnd);
@@ -46,15 +46,15 @@ public class Simulator {
         car.segmentProgress += progressIncrement;
 
         if (car.segmentProgress >= 1.0) {
-            car.currentSegment = (car.currentSegment + 1) % track.centerLine.size();
+            car.currentSegment = (car.currentSegment + 1) % track.getCenterLine().size();
             car.segmentProgress -= 1.0;
         }
     }
 
     private void updateCarWorldPosition() {
-        Point2D segmentStart = track.centerLine.get(car.currentSegment);
-        Point2D segmentEnd = track.centerLine.get(
-                (car.currentSegment + 1) % track.centerLine.size()
+        Point2D segmentStart = track.getCenterLine().get(car.currentSegment);
+        Point2D segmentEnd = track.getCenterLine().get(
+                (car.currentSegment + 1) % track.getCenterLine().size()
         );
 
         double x = segmentStart.x + car.segmentProgress * (segmentEnd.x - segmentStart.x);

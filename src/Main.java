@@ -15,14 +15,11 @@ public class Main {
             renderPanel.setCar(simulator.getCar());
 
             simulator.start();
-
-            System.out.println("Simulation started!");
-            System.out.println("Track points: " + renderPanel.getTrack().centerLine.size());
         });
     }
 
     private static void createSampleTrack(Track track) {
-        int points = 80;
+        int points = 2;
         double radius = 200;
 
         for (int i = 0; i < points; i++) {

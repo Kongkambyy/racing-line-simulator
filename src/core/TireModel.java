@@ -31,7 +31,7 @@ public class TireModel {
             }
         }
 
-        // Doubling the weight on a tire doesnt give you double the grip
+        // Doubling the weight on a tire doesn't give you double the grip
         double maxForce = peakFrictionCoeff * Math.pow(normalLoad, loadSensitivity);
 
         return Math.signum(slipAngle) * maxForce * forceFactor;
