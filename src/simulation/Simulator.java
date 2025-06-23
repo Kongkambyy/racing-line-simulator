@@ -10,14 +10,20 @@ public class Simulator {
     private Car car;
     private Track track;
 
-    private static final double TARGET_FPS = 500.0;
+    private static final double TARGET_FPS = 60.0;
     private static final int TIMER_DELAY = (int)(1000.0 / TARGET_FPS);
     private static final double DT = 1.0 / TARGET_FPS;
+    private final TrackModel trackModel;
 
     public Simulator(RenderPanel renderPanel) {
         this.renderPanel = renderPanel;
         this.track = renderPanel.getTrack();
         this.car = new Car();
+
+        car.velocity = new Vector2D(50, 0);
+
+        TireModel defaultTire = new TireModel();
+        this.trackModel = new TrackModel(defaultTire, this.track);
 
         animationTimer = new Timer(TIMER_DELAY, e -> {
             updateSimulation();
@@ -26,45 +32,59 @@ public class Simulator {
     }
 
     private void updateSimulation() {
-        if (track.getCenterLine().size() < 2) {
+        if (track.getCenterLine().isEmpty()) {
             return;
         }
 
-        double distanceToMove = car.speed * DT;
-        moveCarAlongTrack(distanceToMove);
-        updateCarWorldPosition();
-    }
+        int targetIndex = (car.targetSegment + 1) % track.getCenterLine().size();
+        Point2D targetPoint = track.getCenterLine().get(targetIndex);
 
-    private void moveCarAlongTrack(double distance) {
-        Point2D segmentStart = track.getCenterLine().get(car.currentSegment);
-        Point2D segmentEnd = track.getCenterLine().get(
-                (car.currentSegment + 1) % track.getCenterLine().size()
-        );
+        double vectorToTargetX = targetPoint.x - car.position.x;
+        double vectorToTargetY = targetPoint.y - car.position.y;
 
-        double segmentLength = segmentStart.distanceTo(segmentEnd);
-        double progressIncrement = distance / segmentLength;
-        car.segmentProgress += progressIncrement;
+        double desiredHeading = Math.atan2(vectorToTargetY, vectorToTargetX);
 
-        if (car.segmentProgress >= 1.0) {
-            car.currentSegment = (car.currentSegment + 1) % track.getCenterLine().size();
-            car.segmentProgress -= 1.0;
+        double headingError = normalizeAngle(desiredHeading - car.heading);
+
+        double maxSteerAngle = Math.toRadians(45.0);
+        car.steeringAngle = Math.max(-maxSteerAngle, Math.min(maxSteerAngle, headingError * 2.0));
+
+        double distanceToTarget = car.position.distanceTo(targetPoint);
+        if (distanceToTarget < 50.0) {
+            car.targetSegment = targetIndex;
         }
-    }
 
-    private void updateCarWorldPosition() {
-        Point2D segmentStart = track.getCenterLine().get(car.currentSegment);
-        Point2D segmentEnd = track.getCenterLine().get(
-                (car.currentSegment + 1) % track.getCenterLine().size()
-        );
+        final double GRAVITY = 9.81;
 
-        double x = segmentStart.x + car.segmentProgress * (segmentEnd.x - segmentStart.x);
-        double y = segmentStart.y + car.segmentProgress * (segmentEnd.y - segmentStart.y);
+        double normalLoadFrontAxle = (car.mass * GRAVITY) * 0.5;
+        double normalLoadPerFrontTire = normalLoadFrontAxle / 2.0;
 
-        car.position = new Point2D(x, y);
+        double vehicleHeading = Math.atan2(car.velocity.y, car.velocity.x);
+        double slipAngle = car.steeringAngle - normalizeAngle(vehicleHeading - car.heading);
 
-        double dx = segmentEnd.x - segmentStart.x;
-        double dy = segmentEnd.y - segmentStart.y;
-        car.heading = Math.atan2(dy, dx);
+        double[] resultingForces = trackModel.calculateResultingForces(slipAngle, 0.0, normalLoadPerFrontTire);
+
+        double lateralForce = resultingForces[0];
+        double worldForceX = lateralForce * -Math.sin(car.heading);
+        double worldForceY = lateralForce * Math.cos(car.heading);
+
+        double totalForceX = worldForceX * 2;
+        double totalForceY = worldForceY * 2;
+
+        double accelerationX = totalForceX / car.mass;
+        double accelerationY = totalForceY / car.mass;
+
+        car.velocity.x += accelerationX * DT;
+        car.velocity.y += accelerationY * DT;
+        car.position.x += car.velocity.x * DT;
+        car.position.y += car.velocity.y * DT;
+        car.heading = Math.atan2(car.velocity.y, car.velocity.x);
+
+        if (car.position.distanceTo(new Point2D(0, 0)) > 1000) {
+            car.position = new Point2D(0, 0);
+            car.velocity = new Vector2D(50, 0);
+            car.targetSegment = 0;
+        }
     }
 
     public Car getCar() {
@@ -81,9 +101,10 @@ public class Simulator {
 
     public void reset() {
         stop();
-        car.currentSegment = 0;
-        car.segmentProgress = 0;
-        car.speed = 50;
+        car.position = new Point2D(0, 0);
+        car.velocity = new Vector2D(50, 0);
+        car.targetSegment = 0;
+        car.heading = 0;
     }
 
     public void setTargetFPS(double fps) {
@@ -98,5 +119,11 @@ public class Simulator {
         if (wasRunning) {
             start();
         }
+    }
+
+    private double normalizeAngle(double angle) {
+        while (angle > Math.PI) angle -= 2 * Math.PI;
+        while (angle < -Math.PI) angle += 2 * Math.PI;
+        return angle;
     }
 }
